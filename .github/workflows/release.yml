@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: |
+        gcc -Wall -O2 -std=c99 -o netwatch netwatch.c
+        strip netwatch
+
+    - name: Build DEB package
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        [[ ! $VERSION =~ ^[0-9] ]] && VERSION="1.0.0"
+        ARCH=$(dpkg --print-architecture)
+
+        sudo apt-get install -y devscripts debhelper
+
+        mkdir -p pkg/usr/bin pkg/DEBIAN
+        cp netwatch pkg/usr/bin/
+
+        cat > pkg/DEBIAN/control << EOF
+        Package: netwatch
+        Version: ${VERSION}
+        Architecture: ${ARCH}
+        Maintainer: Ijaz Ahmed <ijaz.vbt@gmail.com>
+        Description: Minimal internet connectivity monitor
+         Detects internet up/down events via TCP probe.
+         Alerts via system notification or user-defined hooks.
+        Section: utils
+        Priority: optional
+        EOF
+
+        dpkg-deb --build pkg netwatch_${VERSION}_${ARCH}.deb
+        echo "DEB_NAME=netwatch_${VERSION}_${ARCH}.deb" >> $GITHUB_ENV
+
+    - name: Upload DEB
+      uses: actions/upload-artifact@v4
+      with:
+        name: netwatch-deb
+        path: "*.deb"
+
+    - name: Create tarball
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        [[ ! $VERSION =~ ^[0-9] ]] && VERSION="1.0.0"
+        tar -czf netwatch-${VERSION}-linux-amd64.tar.gz netwatch README.md
+        echo "TAR_NAME=netwatch-${VERSION}-linux-amd64.tar.gz" >> $GITHUB_ENV
+
+    - name: Upload tarball
+      uses: actions/upload-artifact@v4
+      with:
+        name: netwatch-linux-tarball
+        path: "*.tar.gz"
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: |
+        gcc -Wall -O2 -std=c99 -o netwatch.exe netwatch.c -lws2_32
+        strip netwatch.exe
+
+    - name: Upload EXE
+      uses: actions/upload-artifact@v4
+      with:
+        name: netwatch-windows
+        path: netwatch.exe
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          netwatch-deb/*.deb
+          netwatch-linux-tarball/*.tar.gz
+          netwatch-windows/netwatch.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

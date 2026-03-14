@@ -1,0 +1,69 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: gcc -Wall -Wextra -O2 -std=c99 -o netwatch netwatch.c
+
+    - name: Test --version
+      run: ./netwatch --version
+
+    - name: Test --help
+      run: ./netwatch --help
+
+    - name: Test --once (one-shot check)
+      run: |
+        ./netwatch -1
+        echo "Exit code: $?"
+
+    - name: Test --once exit code is 0 or 1
+      run: |
+        ./netwatch -1
+        CODE=$?
+        if [ $CODE -eq 0 ] || [ $CODE -eq 1 ]; then
+          echo "Valid exit code: $CODE"
+        else
+          echo "Unexpected exit code: $CODE"
+          exit 1
+        fi
+
+    - name: Test Makefile build
+      run: |
+        make clean
+        make
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: netwatch-linux
+        path: netwatch
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build (MinGW)
+      run: gcc -Wall -Wextra -O2 -std=c99 -o netwatch.exe netwatch.c -lws2_32
+
+    - name: Test --version
+      run: ./netwatch.exe --version
+
+    - name: Test --once
+      run: ./netwatch.exe -1
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: netwatch-windows
+        path: netwatch.exe

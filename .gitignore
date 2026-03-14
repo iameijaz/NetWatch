@@ -1,0 +1,6 @@
+netwatch
+netwatch.exe
+*.o
+*.deb
+*.tar.gz
+*.zip
