@@ -24,7 +24,9 @@
   #define _WIN32_WINNT 0x0600
   #include <winsock2.h>
   #include <ws2tcpip.h>
-  #pragma comment(lib, "ws2_32.lib")
+  #ifdef _MSC_VER
+  #  pragma comment(lib, "ws2_32.lib")
+  #endif
   #define CLOSE_SOCKET(s) closesocket(s)
   #define SLEEP_MS(ms)    Sleep(ms)
   typedef SOCKET sock_t;
@@ -180,7 +182,7 @@ static int try_connect(const char *host, int port, int timeout_ms) {
     addr.sin_port        = htons((unsigned short)port);
     addr.sin_addr.s_addr = inet_addr(host);
 
-    if (addr.sin_addr.s_addr == (in_addr_t)-1) return 0;
+    if (addr.sin_addr.s_addr == INADDR_NONE) return 0;
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s == INVALID_SOCK) return 0;
